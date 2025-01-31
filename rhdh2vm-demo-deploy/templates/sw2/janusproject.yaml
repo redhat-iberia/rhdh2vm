@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: janus
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  description: janus
+  destinations:
+    - name: '*'
+      namespace: '*'
+      server: '*'
+  sourceRepos:
+    - '*'

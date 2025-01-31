@@ -1,0 +1,239 @@
+---
+- name: Configure Ansible Automation Controller
+  hosts: localhost
+  gather_facts: false
+ 
+  tasks:
+
+    - name: Create Red Hat CDN Service Account credential type
+      ansible.controller.credential_type:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "Red Hat CDN Service Account"
+        kind: cloud
+        state: present
+        description: "Credential type for Red Hat CDN service account"
+        inputs:
+          fields:
+            - id: rhn_client_id
+              type: string
+              secret: true
+              label: "RHN Client ID"
+            - id: rhn_client_secret
+              type: string
+              secret: true
+              label: "RHN Client Secret"
+        injectors:
+          extra_vars:
+            rhn_password: "{{ '{{ rhn_client_secret }}' }}"
+            rhn_username: "{{ '{{ rhn_client_id }}' }}"
+
+    - name: Create Red Hat CDN User/Pass credential type
+      ansible.controller.credential_type:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "Red Hat CDN User/Pass"
+        description: "Credential type for Red Hat CDN user/pass"
+        state: present
+        kind: cloud
+        inputs:
+          fields:
+            - id: rhn_username
+              type: string
+              label: "RHN Username"
+            - id: rhn_password
+              type: string
+              label: "RHN Password"
+              secret: true
+        injectors:
+          extra_vars:
+            rhsm_username: "{{ '{{ rhn_username }}' }}"
+            rhsm_password: "{{ '{{ rhn_password }}' }}"
+
+    - name: Create Linux user/pass credential
+      ansible.controller.credential:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "Linux user/pass"
+        organization: "Default"
+        state: present
+        credential_type: "Machine"
+        inputs:
+          username: "redhat1"
+          password: "redhat1"
+      register: credential_linux_machine
+
+    - name: Create OpenShift Cluster credential
+      ansible.controller.credential:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "OpenShift Cluster"
+        organization: "Default"
+        credential_type: "OpenShift or Kubernetes API Bearer Token"
+        inputs:
+          host: "{{ openshift_api_url }}"
+          verify_ssl: true
+          bearer_token: "{{ openshift_api_token }}"
+      register: openshift_cluster_cred
+
+    - name: Create My RHN username/password credential
+      ansible.controller.credential:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"      
+        name: "My RHN username/password"
+        organization: "Default"
+        credential_type: "Red Hat CDN User/Pass"
+        inputs:
+          rhn_username: "{{ rhn_username }}"
+          rhn_password: "{{ rhn_password }}"
+      register: rhn_userpass_cred
+
+    - name: Create My RHN Service Account credential
+      ansible.controller.credential:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "My RHN Service Account"
+        organization: "Default"
+        credential_type: "Red Hat CDN Service Account"
+        inputs:
+          rhn_client_id: "{{ rhn_client_id }}"
+          rhn_client_secret: "{{ rhn_client_secret }}"
+      register: rhn_sa_cred
+
+    - name: Create OCP Virt inventory
+      ansible.controller.inventory:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"      
+        name: "OCP Virt"
+        organization: "Default"
+      register: ocp_virt_inventory
+
+    - name: Create OCP Virt inventory source
+      ansible.controller.inventory_source:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "OCP Virt"
+        inventory: "{{ ocp_virt_inventory.id }}"
+        source: openshift_virtualization
+        credential: "{{ openshift_cluster_cred.id }}"
+
+    - name: Create job template [JT] Create VM
+      ansible.controller.job_template:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "[JT] Create VM"
+        description: "Job template for creating virtual machines"
+        inventory: "OCP Virt"
+        project: "OCP Virt"
+        playbook: "playbooks/create_vm.yml"
+        credentials:
+          - "{{ openshift_cluster_cred.id }}"
+        state: present
+
+    - name: Create job template [JT] Install and deploy Jboss EAP 8
+      ansible.controller.job_template:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "[JT] Install and deploy Jboss EAP 8"
+        description: "Job template for installing and deploying Jboss EAP 8"
+        inventory: "OCP Virt"
+        project: "OCP Virt"
+        playbook: "playbooks/install_jboss.yml"
+        credentials:
+          - "{{ credential_linux_machine.id }}"
+          - "{{ rhn_userpass_cred.id }}"
+          - "{{ rhn_sa_cred.id }}"
+        state: present
+    
+    - name: Create job template [JT] Deploy hello world application
+      ansible.controller.job_template:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "[JT] Deploy hello world application"
+        description: "Job template for deploying the hello world application"
+        inventory: "OCP Virt"
+        project: "OCP Virt"
+        playbook: "playbooks/deploy_app.yml"
+        credentials:
+          - "{{ credential_linux_machine.id }}"
+        state: present
+
+    - name: Create job template [JT] Wait for VM connection
+      ansible.controller.job_template:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "[JT] Wait for VM connection"
+        description: "Job template that waits for VM's ssh connection to be available"
+        inventory: "OCP Virt"
+        project: "OCP Virt"
+        playbook: "playbooks/wait_for_connection.yml"
+        credentials:
+          - "{{ credential_linux_machine.id }}"
+        state: present
+
+    - name: Create workflow job template [WF] Create VM and install Jboss
+      ansible.controller.workflow_job_template:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: "[WF] Create VM and install Jboss"
+        description: "Workflow template to create VM, install Jboss, and deploy an app"
+        inventory: "OCP Virt"
+        ask_variables_on_launch: true        
+        workflow_nodes:
+          - identifier: create_vm_node
+            unified_job_template:
+              name: "[JT] Create VM"
+              type: job_template
+            related:
+              success_nodes:
+                - identifier: inventory_sync_node
+          - identifier: inventory_sync_node
+            unified_job_template:
+              name: "OCP Virt"
+              inventory:
+                organization:
+                  name: Default
+              type: inventory_source
+            related:
+              success_nodes:
+                - identifier: wait-for-connection
+          - identifier: wait-for-connection
+            unified_job_template:
+              name: "[JT] Wait for VM connection"
+              type: job_template
+            related:
+              success_nodes:
+                - identifier: install_jboss_node
+          - identifier: install_jboss_node
+            unified_job_template:
+              name: "[JT] Install and deploy Jboss EAP 8"
+              type: job_template
+            related:
+              success_nodes:
+                - identifier: deploy_app_node
+          - identifier: deploy_app_node
+            unified_job_template:
+              name: "[JT] Deploy hello world application"
+              type: job_template
+        state: present
+
+    - name: Delete "Demo Job Template" job template
+      ansible.controller.job_template:
+        controller_host: "{{ my_controller_fqdn }}"
+        controller_username: "{{ my_controller_user }}"
+        controller_password: "{{ my_controller_pass }}"
+        name: Demo Job Template
+        state: absent

@@ -1,0 +1,296 @@
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: configure-aap
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: resources-checker
+      containers:
+        - name: configure-aap
+          image: registry.redhat.io/openshift4/ose-cli
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/bash
+            - '-c'
+            - |
+              # Replace with your Ansible Automation Platform details
+              AAP_URL="https://$(oc get routes {{ .Values.aap.instanceName }} -n {{ .Values.aap.namespaceName }} -o jsonpath='{.spec.host}')"
+              CONTROLLER_API_URL="$AAP_URL/api/controller/v2"
+              GATEWAY_API_URL="$AAP_URL/api/gateway/v1"
+              AAP_USERNAME="admin"
+              AAP_PASSWORD=$(oc get secret {{ .Values.aap.instanceName }}-admin-password -n {{ .Values.aap.namespaceName }} -o jsonpath='{.data.password}' | base64 -d)
+              # Subscription data
+              RHN_USERNAME={{ .Values.rhn.username }}
+              RHN_PASSWORD={{ .Values.rhn.password }}
+              POOL_ID={{ .Values.rhn.poolId }}
+              RHN_CLIENT_ID={{ .Values.rhn.clientId }}
+              RHN_CLIENT_SECRET={{ .Values.rhn.clientSecret }}
+              # Credential creation details
+              AUTOMATION_HUB_URL={{ .Values.automationhub.url }}
+              AUTOMATION_HUB_AUTH_URL={{ .Values.automationhub.authUrl }}
+              AUTOMATION_HUB_API_TOKEN={{ .Values.automationhub.apiToken }}
+              # Other variables needed
+              OCP_API_URL=$(oc get infrastructure cluster -o json | python3 -c "import sys, json; print(json.load(sys.stdin)['status']['apiServerURL'])")
+              OCP_API_TOKEN=$(oc get secret/ansible-user-token -n {{ .Values.aap.namespaceName }} -o jsonpath='{.data.token}' | base64 -d)
+
+              echo "The OpenShift ansible-user token is: $OCP_API_TOKEN"
+
+              # Authenticate in Automation controller
+              echo "Controller authentication"
+              
+              CONTROLLER_RESPONSE=$(curl -k -s -X POST "$CONTROLLER_API_URL/tokens/" \
+                      -H "Content-Type: application/json" \
+                      -u "$AAP_USERNAME:$AAP_PASSWORD" \
+                      -d '{}') # | jq -r '.token')
+              
+              CONTROLLER_TOKEN=$(echo "$CONTROLLER_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('token', ''))")
+
+              if [ -z "$CONTROLLER_TOKEN" ] || [ "$CONTROLLER_TOKEN" == "null" ]; then
+                  echo "Failed to authenticate. Please check your credentials and API URL."
+                  exit 1
+              fi
+              
+              echo "Controller authentication successful. Token: $CONTROLLER_TOKEN"
+              
+              # Configure subscription in Ansible Automation Controller
+              
+              echo "Adding subscription to Ansible Automation Controller"
+              
+              RHN_PAYLOAD=$(cat <<EOF
+              {
+                "subscriptions_username": "$RHN_USERNAME",
+                "subscriptions_password": "$RHN_PASSWORD"
+              }
+              EOF
+              )
+              
+              curl -s -k -X POST "$CONTROLLER_API_URL/config/subscriptions/" \
+              -H "Authorization: Bearer $CONTROLLER_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$RHN_PAYLOAD" > /dev/null
+              
+              SUBSCRIPTION_PAYLOAD=$(cat <<EOF
+              {
+                "username": "$RHN_USERNAME",
+                "password": "$RHN_PASSWORD",
+                "pool_id": "$POOL_ID"
+              }
+              EOF
+              )
+              
+              curl -s -k -X POST "$CONTROLLER_API_URL/config/attach/" \
+                  -H "Authorization: Bearer $CONTROLLER_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d "$SUBSCRIPTION_PAYLOAD" > /dev/null
+                  
+              echo "A subscription has been succesfully configured"
+              
+              # Generating a token for the admin user in AAP and creating a secret that stores it
+              echo "Generating a token for the admin user in AAP and storing it into a secret"
+              
+              ADMIN_USER_TOKEN=$(curl -k -X POST "$CONTROLLER_API_URL/users/admin/tokens/" \
+                  -H "Authorization: Bearer $CONTROLLER_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d '{ "scope": "write", "description": "Token created automatically by helm chart" }' | python3 -c "import sys, json; print(json.load(sys.stdin).get('token', ''))")
+              
+              echo "The token for the admin user is: $ADMIN_USER_TOKEN"
+              
+              # Generating a token for the admin user in AAP and creating a secret that stores it
+              echo "Creating the openshift secret that will be referenced afterwards by the AnsibleJob CR created via Developer Hub"
+              
+              oc create secret generic controller-access \
+              --from-literal=token=$ADMIN_USER_TOKEN \
+              --from-literal=host=$AAP_URL -n {{ .Values.aap.namespaceName }} \
+              --dry-run=client -o yaml | oc apply -f -
+
+              echo "A token for the admin user has been generated and stored in the secret controller-access in namespace {{ .Values.aap.namespaceName }}"
+
+              # Create the credential for connecting with Red Hat Automation Hub
+              echo "Creating Red Hat Automation Hub Credential"
+
+              CREDENTIAL_RESPONSE=$(curl -k -s -X POST "$CONTROLLER_API_URL/credentials/" \
+                  -H "Content-Type: application/json" \
+                  -H "Authorization: Bearer $CONTROLLER_TOKEN" \
+                  -d '{
+                        "name": "Red Hat Automation Hub",
+                        "organization": '1',
+                        "credential_type": '19',
+                        "inputs": {
+                          "url": "'$AUTOMATION_HUB_URL'",
+                          "auth_url": "'$AUTOMATION_HUB_AUTH_URL'",
+                          "token": "'$AUTOMATION_HUB_API_TOKEN'"
+                        }
+                      }') 
+              
+              # Extract the credential ID from the response
+              # CREDENTIAL_ID=$(echo "$CREDENTIAL_RESPONSE" | jq -r '.id')
+              CREDENTIAL_ID=$(echo "$CREDENTIAL_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('id', ''))")
+              
+              # Check if the credential creation was successful
+              if [ -z "$CREDENTIAL_ID" ]; then
+                  echo "Failed to create the credential."
+                  exit 1
+              fi
+              echo "Credential created successfully. Credential ID: $CREDENTIAL_ID"
+              
+              echo "Associate newly created credential to Default organization in correct order"
+              
+              # Disassociate the default Galaxy credential from Default organization
+              curl -s -X POST "${CONTROLLER_API_URL}/organizations/1/galaxy_credentials/" \
+                   -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                   -H "Content-Type: application/json" \
+                   -d "{\"id\": 2, \"disassociate\": true}"
+              
+              # Associate the Red Hat Automation Hub credential to Default organization
+              curl -s -X POST "${CONTROLLER_API_URL}/organizations/1/galaxy_credentials/" \
+                   -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                   -H "Content-Type: application/json" \
+                   -d "{\"id\": ${CREDENTIAL_ID}}"
+              
+              # Associate the Galaxy credential to Default organization (we need to disassociate and associate in order to have the right order)
+              curl -s -X POST "${CONTROLLER_API_URL}/organizations/1/galaxy_credentials/" \
+                   -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                   -H "Content-Type: application/json" \
+                   -d "{\"id\": 2}"
+              
+              echo "Galaxy credentials in Default organization are configured"
+              
+              echo "Create OCP Virt Project"
+              
+              PROJECT_RESPONSE=$(curl -s -X POST "${CONTROLLER_API_URL}/projects/" \
+                   -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                   -H "Content-Type: application/json" \
+                   -d "{
+                         \"name\": \"OCP Virt\",
+                         \"organization\": 1,
+                         \"scm_type\": \"git\",
+                         \"scm_url\": \"https://github.com/redhat-iberia/rhdh2vm.git\"
+                       }") # | jq -r '.id')
+              
+              PROJECT_ID=$(echo "$PROJECT_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('id', ''))")
+
+              echo "OCP Virt project has been created. Project ID: $PROJECT_ID"
+              
+              # Poll the project update status
+              while true; do
+                  PROJECT_UPDATE_STATUS=$(curl -s -X GET "${CONTROLLER_API_URL}/project_updates/?project=${PROJECT_ID}&order_by=-created" \
+                      -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                      -H "Content-Type: application/json" | python3 -c "import sys, json; print(json.load(sys.stdin)['results'][0]['status'])") # jq -r '.results[0].status')
+              
+                  if [[ "$PROJECT_UPDATE_STATUS" == "successful" ]]; then
+                      echo "Project sync completed successfully."
+                      break
+                  elif [[ "$PROJECT_UPDATE_STATUS" == "failed" ]]; then
+                      echo "Project sync failed."
+                      exit 1
+                  else
+                      echo "Project sync is in progress... status is $PROJECT_UPDATE_STATUS"
+                      sleep 10
+                  fi
+              done
+              
+              echo "Project succesfully created and sync'ed"
+              
+              # Define the extra variables in JSON format
+              EXTRA_VARS=$(cat <<EOF
+              {
+                "my_controller_fqdn": "$AAP_URL",
+                "my_controller_user": "$AAP_USERNAME",
+                "my_controller_pass": "$AAP_PASSWORD",
+                "openshift_api_url": "$OCP_API_URL",
+                "openshift_api_token": "$OCP_API_TOKEN",
+                "rhn_username": "$RHN_USERNAME",
+                "rhn_password": "$RHN_PASSWORD",
+                "rhn_client_id": "$RHN_CLIENT_ID",
+                "rhn_client_secret": "$RHN_CLIENT_SECRET"
+              }
+              EOF
+              )
+
+              # Convert the extra_vars JSON to a properly escaped string
+              # EXTRA_VARS_ESCAPED=$(echo "$EXTRA_VARS" | jq -Rs .)
+              EXTRA_VARS_ESCAPED=$(echo "$EXTRA_VARS" | python3 -c "import sys, json; print(json.dumps(sys.stdin.read()))")
+
+              # Create the job template
+              JOB_TEMPLATE_RESPONSE=$(curl -s -X POST "${CONTROLLER_API_URL}/job_templates/" \
+                  -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{
+                        \"name\": \"[CasC] Configure controller\",
+                        \"inventory\": 1,
+                        \"project\": ${PROJECT_ID},
+                        \"playbook\": \"playbooks/controller-configuration.yaml\",
+                        \"extra_vars\": ${EXTRA_VARS_ESCAPED}
+                      }") # | jq -r '.id')
+
+              JOB_TEMPLATE_ID=$(echo "$JOB_TEMPLATE_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('id', ''))")
+              
+              echo "Job template created successfully. Job Template ID: $JOB_TEMPLATE_ID"
+              
+              # Execute the just created template and wait until it has finished succesfully
+              echo "Execute Job Template"
+              
+              JOB_RESPONSE=$(curl -s -X POST "${CONTROLLER_API_URL}/job_templates/${JOB_TEMPLATE_ID}/launch" \
+                  -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                  -H "Content-Type: application/json") # | jq -r '.job')
+              
+              JOB_ID=$(echo "$JOB_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('job', ''))")
+
+              if [[ "$JOB_ID" == "null" ]]; then
+                echo "Failed to launch job. Please check the response for errors."
+                exit 1
+              else
+                echo "Job launched successfully. Job ID: $JOB_ID"
+              fi
+              
+              echo "Wait until the job is completed"
+              
+              # Poll the job status until it is completed
+              while true; do
+                JOB_STATUS=$(curl -s -X GET "${CONTROLLER_API_URL}/jobs/${JOB_ID}/" \
+                    -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                    -H "Content-Type: application/json" | python3 -c "import sys, json; print(json.load(sys.stdin).get('status', ''))") # jq -r '.status')
+              
+                echo "Current Job Status: $JOB_STATUS"
+              
+                if [[ "$JOB_STATUS" == "successful" ]]; then
+                  echo "Job completed successfully."
+                  break
+                elif [[ "$JOB_STATUS" == "failed" ]]; then
+                  echo "Job failed."
+                  exit 1
+                else
+                  echo "Job is still running..."
+                  sleep 10
+                fi
+              done
+              
+              # Delete the job template and the job from controller so there is no trace of our passwords or data we used
+              echo "Deleting Job Template and Job from Automation Controller"
+              
+              # Delete the job template
+              curl -s -X DELETE "${CONTROLLER_API_URL}/job_templates/${JOB_TEMPLATE_ID}/" \
+                  -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                  -H "Content-Type: application/json"
+              
+              # Delete the job
+              curl -s -X DELETE "${CONTROLLER_API_URL}/jobs/${JOB_ID}/" \
+                  -H "Authorization: Bearer ${CONTROLLER_TOKEN}" \
+                  -H "Content-Type: application/json"
+              
+              echo "Job ${JOB_ID} deleted successfully."
+              
+              echo "Finished script"

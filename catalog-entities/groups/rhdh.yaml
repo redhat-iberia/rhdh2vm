@@ -1,0 +1,24 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: development
+  description: Red Hat Developer Hub
+spec:
+  type: team
+  profile:
+    # Intentional no displayName for testing
+    email: development@example.com
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: user1
+  description: user1 group
+spec:
+  type: team
+  profile:
+    # Intentional no displayName for testing
+    email: user1gr@example.com
+  parent: development
+  children: []

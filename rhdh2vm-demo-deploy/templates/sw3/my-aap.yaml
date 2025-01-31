@@ -1,0 +1,25 @@
+apiVersion: aap.ansible.com/v1alpha1
+kind: AnsibleAutomationPlatform
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: aap-operator
+    app.kubernetes.io/name: my-aap-instance
+    app.kubernetes.io/part-of: my-aap-instance
+  name: '{{ .Values.aap.instanceName }}'
+  namespace: '{{ .Values.aap.namespaceName }}'
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  api:
+    log_level: INFO
+    replicas: 1
+  database:
+    postgres_data_volume_init: false
+  eda:
+    disabled: true
+  hub:
+    disabled: true
+  no_log: true
+  redis_mode: standalone
+  route_tls_termination_mechanism: Edge

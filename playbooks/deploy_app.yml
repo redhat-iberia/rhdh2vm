@@ -1,0 +1,25 @@
+- name: Deploy jboss quickstart application
+  hosts: "namespace_{{ my_namespace | default('workloads') | replace('-', '_') }}" #Ansible does not admit "-" in the host names, so it replaces it with "_", hence you need your playbook to be aware of it
+  become: true
+  
+  tasks:
+
+# By default we're deploying helloworld from Jboss quickstarts: https://github.com/jboss-developer/jboss-eap-quickstarts?tab=readme-ov-file
+
+    - name: Install packages needed to deploy application
+      ansible.builtin.dnf:
+        state: latest
+        name:
+          - git
+          - maven
+
+    - name: Clone jboss quickstarts jboss repo
+      ansible.builtin.git:
+        repo: "{{ my_git_repo | default('https://github.com/jboss-developer/jboss-eap-quickstarts.git') }}"
+        dest: "/home/redhat1/{{ my_app_directory | default('jboss-eap-quickstarts') }}"
+
+    - name: Run maven build
+      ansible.builtin.command: "mvn -f /home/redhat1/{{ my_app_directory | default('jboss-eap-quickstarts') }}{{ my_app_path_to_pomxml | default('/helloworld/pom.xml') }} clean package"
+
+    - name: Deploy application to jboss server
+      ansible.builtin.command: "mvn -f /home/redhat1/{{ my_app_directory | default('jboss-eap-quickstarts') }}{{ my_app_path_to_pomxml | default('/helloworld/pom.xml') }} wildfly:deploy"

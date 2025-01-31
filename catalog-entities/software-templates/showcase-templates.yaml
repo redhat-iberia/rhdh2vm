@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: software-templates
+  description: A collection of Backstage templates for Janus-IDP Backstage
+spec:
+  type: url
+  targets:
+     - https://gitlab.apps.cluster-hprzc.hprzc.gcp.redhatworkshops.io/development/rhdh2vm/blob/main/catalog-entities/software-templates/scaffolder-templates/jboss-eap-vm-template/template.yaml

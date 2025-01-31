@@ -1,0 +1,68 @@
+
+# Replace all the "jq9b8-zxxm5" with whatever is the cluster identifier in your environment.
+# You can obtain the cluster identifier of your environment from any other MachineSet available in the cluster.
+
+# Replace the Project ID "cluster-jq9b8" with the one that matches your environment.
+# You can obtain the Project ID of your environment from any other MachineSet available in the cluster.
+
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  annotations:
+    capacity.cluster-autoscaler.kubernetes.io/labels: kubernetes.io/arch=amd64
+    machine.openshift.io/GPU: '0'
+    machine.openshift.io/memoryMb: '16384'
+    machine.openshift.io/vCPU: '4'
+  name: cluster-jq9b8-zxxm5-worker-d
+  namespace: openshift-machine-api
+  labels:
+    machine.openshift.io/cluster-api-cluster: cluster-jq9b8-zxxm5
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: cluster-jq9b8-zxxm5
+      machine.openshift.io/cluster-api-machineset: cluster-jq9b8-zxxm5-worker-d
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: cluster-jq9b8-zxxm5
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: cluster-jq9b8-zxxm5-worker-d
+    spec:
+      lifecycleHooks: {}
+      metadata: {}
+      providerSpec:
+        value:
+          machineType: n2-standard-4
+          userDataSecret:
+            name: worker-user-data
+          deletionProtection: false
+          networkInterfaces:
+            - network: cluster-jq9b8-zxxm5-network
+              subnetwork: cluster-jq9b8-zxxm5-worker-subnet
+          credentialsSecret:
+            name: gcp-cloud-credentials
+          zone: europe-west4-a
+          canIPForward: false
+          metadata:
+            creationTimestamp: null
+          projectID: cluster-jq9b8
+          region: europe-west4
+          kind: GCPMachineProviderSpec
+          disks:
+            - autoDelete: true
+              boot: true
+              image: projects/rhcos-cloud/global/images/rhcos-416-94-202410211619-0-gcp-x86-64
+              labels: {}
+              sizeGb: 128
+              type: pd-ssd
+          tags:
+            - cluster-jq9b8-zxxm5-worker
+          serviceAccounts:
+            - email: cluster-jq9b8-zxxm5-w@cluster-jq9b8.iam.gserviceaccount.com
+              scopes:
+                - 'https://www.googleapis.com/auth/cloud-platform'
+          apiVersion: machine.openshift.io/v1beta1
+          shieldedInstanceConfig: {}

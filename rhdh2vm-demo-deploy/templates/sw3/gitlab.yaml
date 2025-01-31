@@ -1,0 +1,38 @@
+apiVersion: apps.gitlab.com/v1beta1
+kind: GitLab
+metadata:
+  name: '{{ .Values.gitlab.instanceName }}'
+  namespace: '{{ .Values.gitlab.namespaceName }}'
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  chart:
+    values:
+      prometheus:
+        alertmanager:
+          enabled: false
+        pushgateway:
+          enabled: false
+        server:
+          enabled: false
+      nginx-ingress:
+        enabled: false
+      certmanager:
+        install: false
+      global:
+        kas:
+          enabled: false
+        hosts:
+          domain: '{{ .Values.cluster.domain }}'
+        ingress:
+          tls:
+            enabled: false
+          configureCertmanager: false
+          class: none
+          annotations:
+            route.openshift.io/termination: "edge"
+      postgresql:
+        primary:
+          extendedConfiguration: max_connections = 200
+    version: '{{ .Values.gitlab.version }}'

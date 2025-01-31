@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rhdh-sa-token
+  namespace: '{{ .Values.developerhub.namespaceName }}'
+  annotations:
+    kubernetes.io/service-account.name: rhdh-operator
+    argocd.argoproj.io/sync-wave: "4"
+type: kubernetes.io/service-account-token

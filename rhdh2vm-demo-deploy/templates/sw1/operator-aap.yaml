@@ -1,0 +1,36 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.aap.namespaceName }}
+  labels:
+    argocd.argoproj.io/managed-by: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: {{ .Values.aap.operatorGroupName }}
+  namespace: {{ .Values.aap.namespaceName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  upgradeStrategy: Default
+  targetNamespaces:
+    - {{ .Values.aap.namespaceName }}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  labels:
+    operators.coreos.com/ansible-automation-platform-operator.aap: ''
+  name: {{ .Values.aap.subscriptionName }}
+  namespace: {{ .Values.aap.namespaceName }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  installPlanApproval: Automatic
+  name: ansible-automation-platform-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace

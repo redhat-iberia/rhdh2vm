@@ -1,0 +1,25 @@
+kind: Keycloak
+apiVersion: k8s.keycloak.org/v2alpha1
+metadata:
+  name: '{{ .Values.keycloak.instanceName }}'
+  labels:
+    app: sso
+  namespace: '{{ .Values.keycloak.namespaceName }}'
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  instances: 1
+  hostname:
+    hostname: "keycloak.{{ .Values.cluster.domain }}"
+  http:
+    tlsSecret: '{{ .Values.keycloak.tlsSecretName }}'
+  db:
+    vendor: postgres
+    host: postgres-db
+    usernameSecret:
+      name: '{{ .Values.keycloak.dbSecretName }}'
+      key: username
+    passwordSecret:
+      name: '{{ .Values.keycloak.dbSecretName }}'
+      key: password

@@ -1,0 +1,61 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: backstage-read-only
+  namespace: '{{ .Values.developerhub.namespaceName }}'
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+rules:
+  - verbs:
+      - get
+      - list
+      - watch
+    apiGroups:
+      - '*'
+    resources:
+      - pods
+      - pods/log
+      - configmaps
+      - services
+      - deployments
+      - replicasets
+      - horizontalpodautoscalers
+      - ingresses
+      - statefulsets
+      - limitranges
+      - daemonsets
+      - resourcequotas
+      - routes
+  - verbs:
+      - get
+      - list
+      - watch
+    apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+  - verbs:
+      - get
+      - list
+    apiGroups:
+      - metrics.k8s.io
+    resources:
+      - pods
+  - verbs:
+      - get
+      - list
+    apiGroups:
+      - tekton.dev
+    resources:
+      - pipelineruns
+      - taskruns
+  - verbs:
+      - get
+      - list
+    apiGroups:
+      - kubevirt.io
+    resources:
+      - virtualmachines
+      - virtualmachineinstances
+

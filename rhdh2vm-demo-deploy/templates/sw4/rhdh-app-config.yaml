@@ -1,0 +1,181 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: my-backstage-appconfig-developer-hub
+  namespace: rhdh-operator
+  labels:
+    app.kubernetes.io/instance: developer-hub
+    app.kubernetes.io/name: backstage
+data:
+  my-app-config.yaml: |
+    app:
+      baseUrl: ${BACKSTAGE_URL}
+    argocd:
+      appLocatorMethods:
+      - instances:
+        - name: main
+          username: admin 
+          password: ${ARGOCD_PASSWORD}
+          url: ${ARGOCD_URL}
+        type: config
+    auth:
+      environment: production    
+      session:
+        secret: 
+          'authsessionsecret' 
+      providers:
+        oidc:
+          production:
+            clientId: ${KEYCLOAK_CLIENTID}
+            clientSecret: ${KEYCLOAK_CLIENTSECRET}
+            metadataUrl: ${KEYCLOAK_URL}         
+            prompt: auto
+    csp:
+      connect-src:
+      - '''self'''
+      - 'http:'
+      - 'https:'
+      - 'data:'
+      img-src:
+      - '''self'''
+      - 'data:'
+      script-src:
+      - '''self'''
+      - '''unsafe-inline'''
+      - '''unsafe-eval'''
+      script-src-elem:
+      - '''self'''
+      - '''unsafe-inline'''
+      - '''unsafe-eval'''
+    cors:
+      credentials: true
+      methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      origin: ${BACKSTAGE_URL}      
+    backend:
+      auth:
+        keys:
+        - secret: ${BACKEND_SECRET}
+      baseUrl: ${BACKSTAGE_URL}
+      cors:
+        origin: ${BACKSTAGE_URL}
+      listen:
+        host: 0.0.0.0
+        port: 7007        
+      database:
+        connection:
+          password: ${POSTGRESQL_ADMIN_PASSWORD}
+          user: postgres      
+    catalog:
+      locations:
+      - rules:
+        - allow:
+          - Template
+          - Group
+          - User
+        target: https://${GITLAB_HOST}/development/rhdh2vm/blob/main/catalog-entities/all.yaml
+        type: url
+      providers:  
+        gitlab:
+          selfHosted:
+            host: ${GITLAB_HOST}
+            schedule:
+              frequency:
+                seconds: 10
+              timeout:
+                seconds: 60                               
+        keycloakOrg:
+          default:
+            baseUrl: ${KEYCLOAK_URL_CATALOG} 
+            clientId: ${KEYCLOAK_CLIENTID} 
+            clientSecret: ${KEYCLOAK_CLIENTSECRET} 
+            loginRealm: backstage
+            realm: backstage
+            schedule:
+              frequency:
+                minutes: 1
+              initialDelay:
+                seconds: 15
+              timeout:
+                minutes: 1            
+      rules:
+      - allow:
+        - Component
+        - System
+        - API
+        - Resource
+        - Group
+        - Location
+        - User
+    enabled:
+      argocd: true
+      github: false
+      githubOrg: false
+      gitlab: true
+      jenkins: false
+      keycloak: true
+      kubernetes: true
+      ocm: false
+      permission: false
+      sonarqube: false
+      techdocs: true
+    integrations:
+      gitlab:
+      - apiBaseUrl: https://${GITLAB_HOST}/api/v4
+        baseUrl: https://${GITLAB_HOST}
+        host: ${GITLAB_HOST}
+        token: ${GITLAB_TOKEN}        
+    kubernetes:
+      clusterLocatorMethods:
+      - clusters:
+        - authProvider: serviceAccount
+          name: dev-cluster-infra
+          serviceAccountToken: ${K8S_SERVICE_ACCOUNT_TOKEN}
+          skipTLSVerify: true
+          url: ${K8S_API_URL}
+        type: config
+      customResources:
+      - apiVersion: v1
+        group: route.openshift.io
+        plural: routes
+      - group: 'kubevirt.io'
+        apiVersion: 'v1'
+        plural: 'virtualmachines'  
+      - group: 'kubevirt.io'
+        apiVersion: 'v1'
+        plural: 'virtualmachineinstances'          
+      serviceLocatorMethod:
+        type: multiTenant
+    permission:
+      enabled: false
+    proxy:
+      endpoints:
+        /developer-hub:
+          changeOrigin: true
+          pathRewrite:
+            ^/api/proxy/developer-hub/tech-radar: /gitops/janus-idp-gitops/-/raw/main/config/tech-radar.json
+          secure: false
+          target: https://github.com
+        /quay/api:
+          changeOrigin: true
+          headers:
+            Authorization: Bearer ${QUAY_CREDENTIALS}
+            X-Requested-With: XMLHttpRequest
+          secure: false
+          target: https://quay.io
+    quay:
+      uiUrl: https://quay.io
+    scaffolder: null
+    signInPage: oidc   
+    techdocs:
+      builder: local
+      generator:
+        runIn: local
+      publisher:
+        type: local
+      sanitizer:
+        allowedIframeHosts:
+        - www.youtube.com

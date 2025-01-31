@@ -1,0 +1,38 @@
+- name: Deploy jboss to VM's in the configured namespace
+  hosts: "namespace_{{ my_namespace | default('workloads') | replace('-', '_') }}" #Ansible does not admit "-" in the host names, so it replaces it with "_", hence you need your playbook to be aware of it
+  vars:
+    eap_version: '8.0.0'
+    eap_install_workdir: '/opt/'
+    install_name: jboss-eap
+    eap_user: "{{ install_name }}"
+    eap_config_base: standalone-ha.xml
+    eap_home: "{{ eap_install_workdir }}/{{ install_name }}-{{ (eap_version.split('.'))[0:2] | join('.') }}"
+    eap_basedir_prefix: "/opt/{{ inventory_hostname }}"
+    eap_config_name: "{{ install_name }}"
+    eap_instance_name: "{{ install_name }}"
+    service_systemd_env_file: "/etc/eap.conf"
+    service_systemd_conf_file: "/usr/lib/systemd/system/jboss-eap.service"
+    instance_http_ports:
+      - 8080
+  
+  tasks:
+
+    - name: Register to Red Hat
+      become: true
+      redhat_subscription:
+        state: present
+        username: "{{ rhsm_username }}" 
+        password: "{{ rhsm_password }}"
+        auto_attach: true
+
+    - name: Enable jboss repo
+      become: true
+      command: 'subscription-manager repos --enable=jb-eap-8.0-for-rhel-9-x86_64-rpms'
+
+    - name: run jboss role installation
+      ansible.builtin.include_role:
+        name: redhat.eap.eap_install
+
+    - name: run jboss role systemd
+      ansible.builtin.include_role:
+        name: redhat.eap.eap_systemd

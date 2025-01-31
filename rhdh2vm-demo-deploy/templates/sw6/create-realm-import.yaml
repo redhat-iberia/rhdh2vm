@@ -1,0 +1,148 @@
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: create-realm-import
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: resources-checker
+      containers:
+        - name: create-realm-import
+          image: registry.redhat.io/openshift4/ose-cli
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/bash
+            - '-c'
+            - |
+              GITLAB_CLIENT_ID=$(oc get secret gitlab-oauth-secret -n openshift-gitops -o jsonpath='{.data.client_id}' | base64 -d)
+              echo "The Gitlab Client ID is: $GITLAB_CLIENT_ID"
+              GITLAB_CLIENT_SECRET=$(oc get secret gitlab-oauth-secret -n openshift-gitops -o jsonpath='{.data.client_secret}' | base64 -d)
+              echo "The Gitlab Client Secret is: $GITLAB_CLIENT_SECRET"
+              cat << EOF | oc apply -f -
+              apiVersion: k8s.keycloak.org/v2alpha1
+              kind: KeycloakRealmImport
+              metadata:
+                name: my-realm-import
+                labels:
+                  app: sso  
+                namespace: '{{ .Values.keycloak.namespaceName }}'
+              spec:
+                keycloakCRName: '{{ .Values.keycloak.instanceName }}'
+                realm:
+                  id: backstage
+                  realm: backstage
+                  enabled: true
+                  users:
+                    #- username: user1
+                    #  enabled: true
+                    #  emailVerified: true
+                    #  email: user1@example.com
+                    #  credentials:
+                    #    - type: password
+                    #      value: user1       
+                    - username: service-account-backstage
+                      emailVerified: false
+                      enabled: true
+                      totp: false
+                      serviceAccountClientId: backstage
+                      disableableCredentialTypes: []
+                      requiredActions: []
+                      realmRoles:
+                        - myrole
+                        - default-roles-backstage
+                      groups: []                    
+                  roles:
+                    realm:
+                      - name: myrole
+                        description: A custom role
+                        composite: true
+                        composites:
+                          client:
+                            realm-management:
+                              - view-clients
+                              - query-groups
+                              - query-clients
+                              - view-users
+                        clientRole: false          
+                  clients:
+                    - clientId: backstage
+                      name: backstage
+                      protocol: openid-connect
+                      enabled: true
+                      publicClient: false
+                      secret: my-predefined-client-secret
+                      redirectUris:
+                        - "https://backstage.{{ .Values.cluster.domain }}/api/auth/oidc/handler/frame"
+                      webOrigins:
+                        - "https://backstage.{{ .Values.cluster.domain }}"
+                      consentRequired: false
+                      standardFlowEnabled: true
+                      implicitFlowEnabled: true
+                      directAccessGrantsEnabled: true
+                      serviceAccountsEnabled: true
+                      publicClient: false
+                      frontchannelLogout: false
+                      protocol: openid-connect
+                  identityProviders:
+                    - alias: GitlabOIDC
+                      displayName: Gitlab
+                      providerId: oidc
+                      enabled: true
+                      # updateProfileFirstLoginMode: on
+                      trustEmail: true
+                      storeToken: false
+                      addReadTokenRoleOnCreate: false
+                      authenticateByDefault: false
+                      linkOnly: false
+                      hideOnLogin: false
+                      firstBrokerLoginFlowAlias: first broker login
+                      config:
+                        validateSignature: "false"
+                        tokenUrl: https://{{ .Values.gitlab.instanceName }}.{{ .Values.cluster.domain }}/oauth/token
+                        acceptsPromptNoneForwardFromClient: "false"
+                        clientId: $GITLAB_CLIENT_ID
+                        uiLocales: "false"
+                        isAccessTokenJWT: "false"
+                        filteredByClaim: "false"
+                        backchannelSupported: "false"
+                        caseSensitiveOriginalUsername: "false"
+                        disableNonce: "false"
+                        loginHint: "false"
+                        sendClientIdOnLogout: "false"
+                        pkceEnabled: "false"
+                        clientAuthMethod: client_secret_basic
+                        authorizationUrl: https://{{ .Values.gitlab.instanceName }}.{{ .Values.cluster.domain }}/oauth/authorize
+                        disableUserInfo: "false"
+                        sendIdTokenOnLogout: "true"
+                        syncMode: LEGACY
+                        clientSecret: $GITLAB_CLIENT_SECRET
+                        passMaxAge: "false"
+                        allowedClockSkew: "0"
+                      attributeMappings:
+                        - from: email
+                          to: email
+                        - from: name
+                          to: firstName
+                        - from: last_name
+                          to: lastName
+                  identityProviderMappers:
+                    - name: email-mapper
+                      identityProviderAlias: GitlabOIDC
+                      identityProviderMapper: oidc-user-attribute-idp-mapper
+                      config:
+                        syncMode: INHERIT
+                        claim: email
+                        user.attribute: email
+              EOF

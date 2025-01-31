@@ -1,0 +1,116 @@
+github:
+  appId: CHANGE
+  clientId: CHANGE
+  clientSecret: CHANGE
+  privateKey: CHANGE
+auth:
+  sessionSecret: CHANGE
+rhn:
+  username: changeme
+  password: changeme
+  poolId: changeme
+  clientId: changeme
+  clientSecret: changeme
+automationhub:
+  url: https://console.redhat.com/api/automation-hub/content/published/
+  authUrl: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+  apiToken: changeme
+cluster:
+  domain: apps.cluster-grlrs.grlrs.gcp.redhatworkshops.io
+aap:
+  namespaceName: aap
+  operatorGroupName: aap-operatorgroup
+  subscriptionName: ansible-automation-platform-operator
+  instanceName: my-aap
+developerhub:
+  namespaceName: rhdh-operator
+  operatorGroupName: rhdh-operatorgroup
+  subscriptionName: rhdh2vm
+  appConfigConfigMapName: my-backstage-appconfig-developer-hub
+  appConfigConfigMapkey: my-app-config.yaml
+  dynamicPluginsConfigMapName: my-backstage-dynamic-plugins-developer-hub
+  instanceName: developer-hub
+  rhdhSecretName: secrets-rhdh
+gitlab:
+  namespaceName: gitlab-system
+  operatorGroupName: gitlab-system-operator-group
+  subscriptionName: gitlab-operator-kubernetes
+  version: 8.6.4
+  instanceName: gitlab
+  repo1: rhdh2vm
+  repo2: test
+  organizationName: development
+  user1Password: redhat1!
+github:
+  pat: fill-with-your-pat
+  repo1: https://github.com/redhat-iberia/rhdh2vm.git
+  repo2: https://github.com/pablo-preciado/aap-ocpv
+openshiftVirtualization:
+  namespaceName: openshift-cnv
+  operatorGroupName: openshift-cnv-operatorgroup
+  subscriptionName: kubevirt-hyperconverged
+  instanceName: kubevirt-hyperconverged
+tekton:
+  subscriptionName: openshift-pipelines-operator
+keycloak:
+  instanceName: example-keycloak
+  namespaceName: keycloak
+  operatorGroupName: keycloak-operatorgroup
+  subscriptionName: keycloak-subscription
+  tlsSecretName: my-tls-secret
+  dbSecretName: keycloak-db-secret
+  statefulSetName: postgresql-db
+  postgresPassword: testpassword
+  postgresUsername: postgres
+  postgresDb: keycloak
+  crtFile: |
+    -----BEGIN CERTIFICATE-----
+    MIIDZTCCAk2gAwIBAgIUXO3T8gRvoDE4SBOTdKhf55BBs6MwDQYJKoZIhvcNAQEL
+    BQAwQjEaMBgGA1UEAwwRZGVtby5rZXljbG9hay5vcmcxFzAVBgNVBAoMDkRlbW8g
+    S2V5Y2xvYWsuMQswCQYDVQQGEwJVUzAeFw0yNDEyMDkwNzIwNDhaFw0yNTEyMDkw
+    NzIwNDhaMEIxGjAYBgNVBAMMEWRlbW8ua2V5Y2xvYWsub3JnMRcwFQYDVQQKDA5E
+    ZW1vIEtleWNsb2FrLjELMAkGA1UEBhMCVVMwggEiMA0GCSqGSIb3DQEBAQUAA4IB
+    DwAwggEKAoIBAQCm2ePCaIQnR3p00wbtbpzJHriN7/UKLYFfO6M/iybnNiL4V/gZ
+    twaxbPET9CrTK1VVRrSLqICJeDqtCS8fU0jgi5SAS4h9HtYxHehN6zo7qdzTwCvV
+    LicuDlE0j5seXActMVp3QekfDNqPXQMWX38z5Ci3pPOy8rW1X+n5ubd6yFDYiAXB
+    fivs3LTCUCK9ZoHvvRUwGbwrjrQ3JN6j4vRl3QEW8TqaYlSHuJjj9MSXCVZz+FjJ
+    v09blwQGZle0RDcnLsymABJMuavUA53OIFfMWcohVCQ4SzuM3fKmEtK9j6u+tAiP
+    Vbtdf3L6USllTSHXUWi1CbHGHXCpa+j3JFrbAgMBAAGjUzBRMB0GA1UdDgQWBBT/
+    kTv+tG8vgS2ayes4d5fwTRD4tDAfBgNVHSMEGDAWgBT/kTv+tG8vgS2ayes4d5fw
+    TRD4tDAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQAA9J9Bx4Pz
+    aoaIldugGjd1Zvw8nYsyiZCrxobdDr90jG17u5S1omzC31E84AbzcUrZsaWPqdvT
+    qd7dWOVAH7MIJwsuNiTANVUM1VDlOZ8o2c/34KqE86X37ILKC3uEIPzYdUH/By+c
+    1w0laOXrOvoxjeDWbp+/ZlueTI5jmNFa4Rb545YLDdL0LjW13D0UVu6cLojWjXxA
+    RVuIYrzOS4dzBRBaKerKohHuwyQ1d2Ns9hnEXGCN3kTcl5goXOlc9nJRn9B+2V3a
+    9e1/Eq7RzUDHyky+E5+XYHwxCjMcDufqDMj9Kc2boc9IFjI3MudKB+m0BHpk5Ofh
+    givt+x57g6RS
+    -----END CERTIFICATE-----
+  keyFile: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCm2ePCaIQnR3p0
+    0wbtbpzJHriN7/UKLYFfO6M/iybnNiL4V/gZtwaxbPET9CrTK1VVRrSLqICJeDqt
+    CS8fU0jgi5SAS4h9HtYxHehN6zo7qdzTwCvVLicuDlE0j5seXActMVp3QekfDNqP
+    XQMWX38z5Ci3pPOy8rW1X+n5ubd6yFDYiAXBfivs3LTCUCK9ZoHvvRUwGbwrjrQ3
+    JN6j4vRl3QEW8TqaYlSHuJjj9MSXCVZz+FjJv09blwQGZle0RDcnLsymABJMuavU
+    A53OIFfMWcohVCQ4SzuM3fKmEtK9j6u+tAiPVbtdf3L6USllTSHXUWi1CbHGHXCp
+    a+j3JFrbAgMBAAECggEAPradNgBE0+K481oyO2IdCjdC1Q7BQp8SBnKLDKJH8BXY
+    FRIzja7OlDfHcWGQCyk5fMEDsY6XKZSIMWvHS3XpaYTtPz+kwKqrhXChVVA55h0V
+    hH2xvAIJ9fSpryDfBA1BIUpwn2ylq+cP61zhgTJJxH5Yk5YrhzJU/CRd9GBKx5oR
+    8xGzAVuKJP3qfep7A6cziNJYYpSp+nIS0adw94pDk+HClO+5frrX2CmA9w/V+TCH
+    OMi8fkuAg2ullCzkwNhBqACyEzmqPlTFfGd5FJPfDro54ZAA8B/Du/a/9un6c2CF
+    fwixSgc9RIvY90TLyfoS6aAuBQWKFr5Zy240mLxz0QKBgQDP7zhjYJY54dfoYmbH
+    8jMVHCh5DXur0XeFhXqhL5+CGn4Mbb/T1zJP4IpCz5iBPLaryCoqU17DFc0vKT6L
+    TUmz8Xtk5qnnJACsbIT7pzq8i08wEHq/8+GGhZtOPGOOjYJVLclE2iydh3ftzlut
+    C7gKAACLNXWD5/FcWkIo0KA/qQKBgQDNa4NDhmg53vQiUAA1aQp3T/W/Pfhb6kQb
+    UJCIZSZ4hJ665E1873onGrYlGpkXJIFIj+QzUL7nbTSqw/V/yn9lo+ZenPiZdz0B
+    gxuuR4+slSfnC7TAr91eEPOY3sSRPAZNv1aywqJft3wD+FzBi8T+XJQpJ3RYeXQK
+    0A05BD2o4wKBgHkW0VqmA7X/fDF7JGmp9O+FL1iXbn63hAgAnFJDnnswnFj2jLB7
+    8HOtyjZwGFqilaph7ZQqatPm3U9qkF6lCpe8t+Qho63UPIQsyiCW2VC1O888uY8R
+    IjOpmLCt4DhC1jRubngnKbYvDrsw4hha67j/GVH4NtAzAU6LzV1haQDJAoGAUZ3x
+    BohFqxCpoWR14MK+dM9hTb3aivKWYt/svTSrR2EyDAGfxA8GUrkrO6zIvMg1UdZS
+    Dg17/EmIjnzTcxXK7mBjrJ3jrF4S8CHegq1OKX0N4J/nDlQRuUk08D06jpXxzzxB
+    vz7T8wHdFVq9x+y3tXSlLYDOmkSPVah6SHgl448CgYAXy0dMhVBSKsHx4daFquu5
+    79g5tXZc9OnxFDVMUVBeBgPBLfi65Tie911N4C0sy8HncUlwgu9Y6qUtW7DmHhAY
+    zUEU8RCpKi4yYJrSB4oE5NZWF/WPA2++rWM8D4j0N3bWq5EvKn9U/e/3jdSC/8Ue
+    GMoGUSFJgjPk50nZAvC4Aw==
+    -----END PRIVATE KEY-----

@@ -1,0 +1,194 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: jboss-eap-vm
+  title: JBoss EAP Service with Ansible and Openhift Virtualization
+  description: Create a simple service using JBoss EAP and a OpenShift Virtualization
+  tags:
+    - recommended
+    - java
+    - jboss
+    - maven
+    - eap
+spec:
+  owner: user1
+  type: service
+  parameters:
+    - title: Provide Information for Application
+      required:
+        - component_id
+        - ansibleJob
+      properties:
+        component_id:
+          title: Name
+          type: string
+          description: Unique name of the component
+          default: jbosseap
+          ui:field: EntityNamePicker
+          maxLength: 14
+        ansibleJob:
+          title: Ansible Job
+          type: string
+          default: '[WF] Create VM and install Jboss'
+          description: Ansible Job
+        description:
+          title: Description
+          type: string
+          description: Help others understand what this website is for.
+          default: A Jboss EAP 8 app      
+    - title: Provide VM size
+      required:
+        - image_registry
+      properties:
+        image_registry:
+          title: Virtual Machines
+          type: string
+          enum:
+            - Medium
+            - Small
+      dependencies:
+        image_registry:
+          oneOf:
+            - properties:
+                image_registry:
+                  enum:
+                    - Medium
+                image_host:
+                  title: Image
+                  type: string
+                  description: 1 CPU - 4Gb
+                  default: 1 CPU - 4Gb
+                image_tag:
+                  title: Image Tag
+                  default: latest
+                  type: string
+                  description: Build Image tag
+            - properties:
+                image_registry:
+                  enum:
+                    - Small
+                image_host:
+                  title: Image
+                  type: string
+                  description: 1 cpu - 1 Gb
+                  default: 1 cpu - 1 Gb
+                image_organization:
+                  title: Organization
+                  type: string
+                  description: Name of the Quay Organization
+                  default: janus-backstage
+                image_tag:
+                  title: Image Tag
+                  default: latest
+                  type: string
+                  description: Build Image tag
+    - title: Application repository Information
+      required:
+        - repo
+      properties:
+        repo:
+          title: Repository Location
+          type: object
+          properties:
+            host:
+              title: Repo Host
+              type: string
+              description: Your SCM host
+              default: CHANGE_THIS:gitlab.apps.cluster-rbztz.rbztz.gcp.redhatworkshops.io
+            owner:
+              title: Repo Owner
+              type: string
+              description: Your SCM host organization/group
+              default: development
+              enum:
+                - development
+
+  steps:
+    - id: template
+      name: Fetch Skeleton + Template
+      action: fetch:template
+      input:
+        url: ./skeleton
+        copyWithoutRender:
+          - .github/workflows/*
+        values:
+          component_id: ${{ parameters.component_id }}
+          description: ${{ parameters.description }}
+          namespace: ${{ parameters.component_id }}dev
+          ansibleJob: ${{ parameters.ansibleJob }}
+          owner: ${{ user.entity.metadata.name }}
+          cluster: .apps.cluster-rbztz.rbztz.gcp.redhatworkshops.io
+          host: ${{ parameters.repo.host }}
+          destination: ${{ parameters.repo.owner }}/${{ parameters.component_id }}
+          quay_destination: ${{ parameters.image_organization}}/${{ parameters.component_id }}
+          port: 8080
+          argonamespace: openshift-gitops
+
+    - id: publish
+      name: Publish
+      action: publish:gitlab
+      input:
+        repoUrl: "${{ parameters.repo.host }}?owner=${{ parameters.repo.owner }}&repo=${{parameters.component_id}}"
+        repoVisibility: public
+
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: "/catalog-info.yaml"
+
+    - id: template-gitops-deployment
+      name: Generating Deployment Resources
+      action: fetch:template
+      input:
+        url: ./manifests
+        copyWithoutTemplating: []
+        values:
+          component_id: ${{ parameters.component_id }}
+          description: ${{ parameters.description }}
+          destination: https://${{ parameters.repo.host }}/${{ parameters.repo.owner }}/${{parameters.component_id}}-gitops.git
+          source_repository: https://${{ parameters.repo.host }}/${{ parameters.repo.owner }}/${{parameters.component_id}}.git
+          repository_name: ${{parameters.component_id}}
+          git_owner: ${{ parameters.repo.owner }}
+          namespace: ${{ parameters.component_id }}dev
+          image_registry: ${{ parameters.image_registry }}
+          image_host: ${{ parameters.image_host }}
+          image_organization: ${{ parameters.image_organization }}
+          image_name: ${{ parameters.component_id }}
+          image_tag: ${{ parameters.image_tag }}
+          port: 8080
+          repository_host: ${{ parameters.repo.host }}
+          deployment_name: quarkus-template
+          user: ${{ user.entity.metadata.name }}
+          ansibleJob: ${{ parameters.ansibleJob }}          
+          argonamespace: openshift-gitops
+        targetPath: ./tenant-gitops
+
+    - id: publish-gitops
+      name: Publishing to Resource Repository
+      action: publish:gitlab
+      input:
+        repoUrl: "${{ parameters.repo.host }}?owner=${{ parameters.repo.owner }}&repo=${{parameters.component_id}}-gitops"
+        title: gitops resources for ${{ parameters.component_id }}
+        description: gitops resources for ${{ parameters.component_id }}
+        sourcePath: ./tenant-gitops
+        repoVisibility: public
+
+    - id: create-argocd-resources
+      name: Create ArgoCD Resources
+      action: argocd:create-resources
+      input:
+        appName: ${{ parameters.component_id }}-bootstrap
+        argoInstance: main
+        namespace: openshift-gitops
+        repoUrl: https://${{ parameters.repo.host }}/${{ parameters.repo.owner }}/${{ parameters.component_id }}-gitops.git
+        path: 'argocd/'
+
+  output:
+    links:
+      - title: Source Code Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+      - title: Open Component in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}

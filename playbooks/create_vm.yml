@@ -1,0 +1,111 @@
+- name: Create VM with service and route
+  hosts: localhost
+
+  tasks:
+
+  - name: Create project
+    redhat.openshift.k8s:
+      state: present
+      definition:
+        apiVersion: project.openshift.io/v1
+        kind: Project
+        metadata:
+          name: "{{ my_namespace | default('workloads') }}"
+
+  - name: Create RHEL9 virtual machine
+    redhat.openshift_virtualization.kubevirt_vm:
+      state: present
+      name: jboss8
+      namespace: "{{ my_namespace | default('workloads') }}"
+      labels:
+        app: jboss8
+        backstage.io/kubernetes-id: "{{ my_label_app_name | default('this-is-a-default-value') }}"
+      instancetype:
+        name: "{{ my_instancetype | default('u1.medium') }}"
+      preference:
+        name: rhel.9
+      data_volume_templates:
+        - metadata:
+            name: rhel9-containerdisk
+          spec:
+            sourceRef:
+              name: rhel9
+              kind: DataSource
+              namespace: openshift-virtualization-os-images
+            storage:
+              resources:
+                requests:
+                  storage: 30Gi
+      spec:
+        domain:
+          devices:
+            interfaces:
+              - name: default
+                masquerade: {}
+        networks:
+          - name: default
+            pod: {}
+        volumes:
+          - dataVolume:    
+              name: rhel9-containerdisk
+            name: rootdisk
+          - cloudInitNoCloud:
+              userData: |
+                #cloud-config
+                chpasswd:
+                  expire: false
+                password: redhat1
+                user: redhat1
+                ssh_pwauth: true
+            name: cloudinit
+  
+  - name: Wait for virtual machine IP to be populated
+    kubernetes.core.k8s_info:
+      api_version: kubevirt.io/v1
+      kind: VirtualMachineInstance
+      name: jboss8
+      namespace: "{{ my_namespace | default('workloads') }}"
+    register: vmi
+    retries: 60
+    delay: 10
+    until: (vmi.resources[0].status.interfaces[0]['ipAddress'] | default('')) | length > 0
+
+  - name: Create a service for exposing the VM
+    redhat.openshift.k8s:
+      state: present
+      definition:
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: jboss8-svc
+          namespace: "{{ my_namespace | default('workloads') }}"
+          labels:
+            backstage.io/kubernetes-id: "{{ my_label_app_name | default('this-is-a-default-value') }}"
+        spec:
+          selector:
+            app: jboss8
+          ports:
+            - name: jboss8-port
+              protocol: TCP
+              port: 8080
+              targetPort: 8080
+  
+  - name: Create a route for exposing application in our VM
+    redhat.openshift.k8s:
+      state: present
+      definition:
+        kind: Route
+        apiVersion: route.openshift.io/v1
+        metadata:
+          name: jboss8-route
+          namespace: "{{ my_namespace | default('workloads') }}"
+          labels:
+            backstage.io/kubernetes-id: "{{ my_label_app_name | default('this-is-a-default-value') }}"
+        spec:
+          to:
+            kind: Service
+            name: jboss8-svc
+            weight: 100
+          port:
+            targetPort: 8080
+          wildcardPolicy: None
