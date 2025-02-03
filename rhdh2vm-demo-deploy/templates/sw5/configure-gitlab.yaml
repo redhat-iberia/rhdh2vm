@@ -38,11 +38,11 @@ spec:
               GITHUB_REPO_1="{{ .Values.github.repo1 }}"
               echo "gh repo 1 $GITHUB_REPO_1"
               GITLAB_REPO_1="{{ .Values.gitlab.repo1 }}"
-              echo "gitlab repo 1 $GITLAB_REPO_1
+              echo "gitlab repo 1 $GITLAB_REPO_1"
               GITHUB_REPO_2="{{ .Values.github.repo2 }}"
-              echo "gh repo 2 $GITHUB_REPO_2
+              echo "gh repo 2 $GITHUB_REPO_2"
               GITLAB_REPO_2="{{ .Values.gitlab.repo2 }}"
-              echo "gitlab repo 2 $GITLAB_REPO_1
+              echo "gitlab repo 2 $GITLAB_REPO_2"
               KEYCLOAK_APPLICATION_NAME="keycloak"
               KEYCLOAK_REDIRECT_URI="https://keycloak.{{ .Values.cluster.domain }}/realms/backstage/broker/GitlabOIDC/endpoint"
               ORGANIZATION_NAME="{{ .Values.gitlab.organizationName }}"
