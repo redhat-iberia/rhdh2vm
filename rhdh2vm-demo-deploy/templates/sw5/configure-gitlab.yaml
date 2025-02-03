@@ -153,7 +153,7 @@ spec:
               echo "Importing GitHub repository 1-> $GITHUB_REPO_1"
               
               # Retrieve repository details
-              GITHUB_REPO_API=$(echo "$GITHUB_REPO_1" | sed -E 's|https://github.com/||')
+              GITHUB_REPO_API=$(echo "$GITHUB_REPO_1" | sed -E 's|https://github.com/||' | sed -E 's|.git$||')
               REPO_DETAILS=$(curl -s "https://api.github.com/repos/$GITHUB_REPO_API")
               
               # Extract the numeric repository ID
@@ -183,7 +183,7 @@ spec:
               echo "Importing GitHub repository 2-> $GITHUB_REPO_2"
               
               # Retrieve repository details
-              GITHUB_REPO_API=$(echo "$GITHUB_REPO_2" | sed -E 's|https://github.com/||')
+              GITHUB_REPO_API=$(echo "$GITHUB_REPO_2" | sed -E 's|https://github.com/||' | sed -E 's|.git$||')
               REPO_DETAILS=$(curl -s "https://api.github.com/repos/$GITHUB_REPO_API")
               
               # Extract the numeric repository ID
