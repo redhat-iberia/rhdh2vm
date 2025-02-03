@@ -50,13 +50,23 @@ spec:
               # Authenticate and get GitLab access token
               echo "Authenticating with GitLab..."
               GITLAB_AUTH_RESPONSE=$(curl -s --request POST "$GITLAB_URL/oauth/token" --data "grant_type=password" --data "username=$ROOT_USER" --data "password=$ROOT_PASS")
-              GITLAB_TOKEN=$(echo "$GITLAB_AUTH_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
               
+              # Debug statement to print the authentication response
+              echo "GitLab Authentication Response: $GITLAB_AUTH_RESPONSE"
+              
+              # Check if the response is valid JSON
+              if echo "$GITLAB_AUTH_RESPONSE" | python3 -c "import sys, json; json.load(sys.stdin)" 2>/dev/null; then
+                GITLAB_TOKEN=$(echo "$GITLAB_AUTH_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+              else
+                echo "Invalid JSON response from GitLab authentication. Response: $GITLAB_AUTH_RESPONSE"
+                exit 1
+              fi
+
               if [ -z "$GITLAB_TOKEN" ] || [ "$GITLAB_TOKEN" == "null" ]; then
                 echo "Authentication failed. Check your credentials."
                 exit 1
               fi
-              
+
               echo "GitLab authentication successful. Token-> $GITLAB_TOKEN"
               
               # Enable GitHub import capability
