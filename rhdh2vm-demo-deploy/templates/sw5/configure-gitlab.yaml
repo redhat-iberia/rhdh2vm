@@ -28,13 +28,21 @@ spec:
             - |
               # Variables
               GITLAB_URL="https://{{ .Values.gitlab.instanceName }}.{{ .Values.cluster.domain }}"
+              echo "gitlab url $GITLAB_URL"
               ROOT_USER="root"
+              echo "root user $ROOT_USER"
               ROOT_PASS=$(oc get secret/gitlab-gitlab-initial-root-password -n gitlab-system -o jsonpath='{.data.password}' | base64 -d)
+              echo "root pass $ROOT_PASS"
               GITHUB_PAT="{{ .Values.github.pat }}"
+              echo "gh pat $GITHUB_PAT"
               GITHUB_REPO_1="{{ .Values.github.repo1 }}"
+              echo "gh repo 1 $GITHUB_REPO_1"
               GITLAB_REPO_1="{{ .Values.gitlab.repo1 }}"
+              echo "gitlab repo 1 $GITLAB_REPO_1
               GITHUB_REPO_2="{{ .Values.github.repo2 }}"
+              echo "gh repo 2 $GITHUB_REPO_2
               GITLAB_REPO_2="{{ .Values.gitlab.repo2 }}"
+              echo "gitlab repo 2 $GITLAB_REPO_1
               KEYCLOAK_APPLICATION_NAME="keycloak"
               KEYCLOAK_REDIRECT_URI="https://keycloak.{{ .Values.cluster.domain }}/realms/backstage/broker/GitlabOIDC/endpoint"
               ORGANIZATION_NAME="{{ .Values.gitlab.organizationName }}"
